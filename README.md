@@ -1,11 +1,11 @@
 # Navigator
 
-See [docs](https://hexdocs.pm/navigator) for documentation.
+See [docs](https://hexdocs.pm/live_navigator) for documentation.
 
 ## Installation
 
-If [available in Hex](https://hex.pm/docs/publish), the package can be installed
-by adding `navigator` to your list of dependencies in `mix.exs`:
+The package can be installed by adding `navigator` to your list of dependencies
+in `mix.exs`:
 
 ```elixir
 def deps do

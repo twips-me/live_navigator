@@ -7,7 +7,7 @@ defmodule Navigator.MixProject do
       version: "0.1.0",
       elixir: "~> 1.14",
       source_url: "https://github.com/twips-me/navigator",
-      homepage_url: "https://hex.pm/packages/navigator",
+      homepage_url: "https://hex.pm/packages/live_navigator",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       docs: docs(),
@@ -49,7 +49,7 @@ defmodule Navigator.MixProject do
 
   defp package do
     [
-      name: "navigator",
+      name: "live_navigator",
       files: ~w[lib .formatter.exs mix.exs README* LICENSE*],
       licenses: ["Apache-2.0"],
       links: %{"GitHub" => "https://github.com/twips-me/navigator"},
