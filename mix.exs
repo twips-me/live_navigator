@@ -52,7 +52,7 @@ defmodule Navigator.MixProject do
   defp package do
     [
       name: "live_navigator",
-      files: ~w[lib .formatter.exs mix.exs README* LICENSE*],
+      files: ~w[lib dist .formatter.exs mix.exs package.json README* LICENSE*],
       licenses: ["Apache-2.0"],
       links: %{"GitHub" => "https://github.com/twips-me/navigator"},
     ]
