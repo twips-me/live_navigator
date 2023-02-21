@@ -15,7 +15,7 @@ defmodule Navigator do
 
   Add library to dependencies
 
-      {:navigator, "~> 0.1"},
+      {:navigator, "~> 0.1", hex: :live_navigator}
 
   Add `Navigator` to your application supervisor
 
