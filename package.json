@@ -1,0 +1,15 @@
+{
+  "name": "live_navigator",
+  "version": "0.1.1",
+  "description": "Navigator JS files",
+  "license": "MIT",
+  "module": "./dist/navigator.js",
+  "exports": {
+    "import": "./dist/navigator.js"
+  },
+  "files": [
+    "package.json",
+    "dist/*",
+    "assets/js/*"
+  ]
+}

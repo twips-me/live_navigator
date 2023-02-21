@@ -4,7 +4,7 @@ defmodule Navigator.MixProject do
   def project do
     [
       app: :navigator,
-      version: "0.1.0",
+      version: "0.1.1",
       elixir: "~> 1.14",
       source_url: "https://github.com/twips-me/navigator",
       homepage_url: "https://hex.pm/packages/live_navigator",
@@ -13,6 +13,7 @@ defmodule Navigator.MixProject do
       docs: docs(),
       description: description(),
       package: package(),
+      aliases: aliases(Mix.env),
     ]
   end
 
@@ -26,6 +27,7 @@ defmodule Navigator.MixProject do
     [
       {:phoenix_live_view, "~> 0.18"},
       {:plug, "~> 1.14"},
+      {:esbuild, "~> 0.5", runtime: false},
 
       # code climate
       {:credo, "~> 1.6", only: [:dev, :test], runtime: false},
@@ -53,6 +55,25 @@ defmodule Navigator.MixProject do
       files: ~w[lib .formatter.exs mix.exs README* LICENSE*],
       licenses: ["Apache-2.0"],
       links: %{"GitHub" => "https://github.com/twips-me/navigator"},
+    ]
+  end
+
+  defp aliases(:prod) do
+    [
+      "assets.build": [
+        "cmd rm -rf assets/node_modules",
+        "cmd --cd assets npm install --quite",
+        "esbuild --runtime-config default assets/js/navigator.js --minify --format=esm --outdir=dist",
+      ],
+    ]
+  end
+  defp aliases(_) do
+    [
+      "assets.build": [
+        "cmd rm -rf assets/node_modules",
+        "cmd --cd assets npm install --quite",
+        "esbuild --runtime-config default assets/js/navigator.js --format=esm --outdir=dist",
+      ],
     ]
   end
 end

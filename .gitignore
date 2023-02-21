@@ -28,3 +28,6 @@ navigator-*.tar
 
 .DS_Store
 /**/.DS_Store
+
+/assets/node_modules
+/assets/package-lock.json
