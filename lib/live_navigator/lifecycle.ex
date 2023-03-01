@@ -29,27 +29,27 @@ defmodule LiveNavigator.Lifecycle do
   @spec on_page_refresh(Macro.t) :: Macro.t
   @spec on_page_refresh(Macro.t, arg) :: Macro.t
   defmacro on_page_refresh(module, arg \\ nil) do
-    module = parse_module(module, {:on_page_refresh, 2}, __CALLER__)
+    module = parse_module(module, {:on_page_refresh, 3}, __CALLER__)
     quote do
-      @live_navigator_lifecycle {:on_page_refresh, unquote(module), unquote(arg)}
+      @live_navigator_lifecycle {:on_page_refresh, {unquote(module), unquote(arg)}}
     end
   end
 
   @spec on_page_enter(Macro.t) :: Macro.t
   @spec on_page_enter(Macro.t, arg) :: Macro.t
   defmacro on_page_enter(module, arg \\ nil) do
-    module = parse_module(module, {:on_page_enter, 4}, __CALLER__)
+    module = parse_module(module, {:on_page_enter, 5}, __CALLER__)
     quote do
-      @live_navigator_lifecycle {:on_page_enter, unquote(module), unquote(arg)}
+      @live_navigator_lifecycle {:on_page_enter, {unquote(module), unquote(arg)}}
     end
   end
 
   @spec on_page_leave(Macro.t) :: Macro.t
   @spec on_page_leave(Macro.t, arg) :: Macro.t
   defmacro on_page_leave(module, arg \\ nil) do
-    module = parse_module(module, {:on_page_leave, 2}, __CALLER__)
+    module = parse_module(module, {:on_page_leave, 5}, __CALLER__)
     quote do
-      @live_navigator_lifecycle {:on_page_leave, unquote(module), unquote(arg)}
+      @live_navigator_lifecycle {:on_page_leave, {unquote(module), unquote(arg)}}
     end
   end
 
@@ -60,8 +60,8 @@ defmodule LiveNavigator.Lifecycle do
     if function_exported?(view, :__navigator__, 1) do
       :lifecycle
       |> view.__navigator__()
-      |> Enum.filter(& match?({^action, _, _}, &1))
-      |> Enum.reduce_while({:cont, socket}, fn {_, mod, mod_arg}, {_, socket} ->
+      |> Enum.filter(& match?({^action, _}, &1))
+      |> Enum.reduce_while({:cont, socket}, fn {_, {mod, mod_arg}}, {_, socket} ->
         if function_exported?(mod, action, length(args) + 2) do
           case apply(mod, action, [mod_arg | args] ++ [socket]) do
             {:cont, socket} -> {:cont, {:cont, socket}}
@@ -78,7 +78,7 @@ defmodule LiveNavigator.Lifecycle do
 
   defp parse_module(module, fun, caller) do
     if Macro.quoted_literal?(module) do
-      Macro.prewalk(module, &expand_alias(&1, caller, fun))
+      Macro.prewalk(module, & expand_alias(&1, caller, fun))
     else
       module
     end
