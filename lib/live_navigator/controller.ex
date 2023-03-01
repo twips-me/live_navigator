@@ -1,17 +1,17 @@
-defmodule Navigator.Controller do
+defmodule LiveNavigator.Controller do
   @moduledoc false
 
-  alias Navigator.{Page, Storage}
+  alias LiveNavigator.{Page, Storage}
 
   use GenServer
 
-  @type session_id :: Navigator.session_id
-  @type tab :: Navigator.tab
-  @type url :: Navigator.url
-  @type view :: Navigator.view
-  @type action :: Navigator.action
+  @type session_id :: LiveNavigator.session_id
+  @type tab :: LiveNavigator.tab
+  @type url :: LiveNavigator.url
+  @type view :: LiveNavigator.view
+  @type action :: LiveNavigator.action
 
-  @app :navigator
+  @app :live_navigator
   @cleanup_timeout Application.compile_env(@app, :cleanup_timeout, 60 * 60) # cleanup every hour
   @nav_ttl Application.compile_env(@app, :nav_ttl, 60 * 60 * 24 * 3) # data TTL is 3 days
   @storage_timeout Application.compile_env(@app, :storage_timeout, :immediately)
@@ -23,18 +23,18 @@ defmodule Navigator.Controller do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
   end
 
-  @spec get_navigator() :: Navigator.t | nil
-  @spec get_navigator(pid) :: Navigator.t | nil
-  @spec get_navigator(session_id, tab) :: Navigator.t | nil
+  @spec get_navigator() :: LiveNavigator.t | nil
+  @spec get_navigator(pid) :: LiveNavigator.t | nil
+  @spec get_navigator(session_id, tab) :: LiveNavigator.t | nil
   def get_navigator(pid \\ self()) do
-    case :ets.lookup(Navigator.PIDs, pid) do
+    case :ets.lookup(LiveNavigator.PIDs, pid) do
       [{_, {session_id, tab}, _}] -> get_navigator(session_id, tab)
       _ -> nil
     end
   end
   def get_navigator(session_id, tab) do
-    case :ets.lookup(Navigator, {session_id, tab}) do
-      [nav] -> decode(Navigator, nav)
+    case :ets.lookup(LiveNavigator, {session_id, tab}) do
+      [nav] -> decode(LiveNavigator, nav)
       _ -> nil
     end
   end
@@ -43,7 +43,7 @@ defmodule Navigator.Controller do
   @spec get_page(pid) :: Page.t | nil
   @spec get_page(session_id, tab, view, action) :: Page.t | nil
   def get_page(pid \\ self()) do
-    case :ets.lookup(Navigator.PIDs, pid) do
+    case :ets.lookup(LiveNavigator.PIDs, pid) do
       [{_pid, {session_id, tab}, {view, action}}] -> get_page(session_id, tab, view, action)
       _ -> nil
     end
@@ -55,36 +55,36 @@ defmodule Navigator.Controller do
     end
   end
 
-  @spec load_navigator(session_id, tab) :: Navigator.t
+  @spec load_navigator(session_id, tab) :: LiveNavigator.t
   def load_navigator(session_id, tab) do
     now = now()
     pid = self()
     key = {session_id, tab}
     GenServer.cast(__MODULE__, {:monitor, pid})
-    case :ets.lookup(Navigator, key) do
+    case :ets.lookup(LiveNavigator, key) do
       [{_key, ^pid, _, _, _, _, _, _, _} = nav] ->
-        :ets.update_element(Navigator, key, [{3, now}])
-        GenServer.cast(__MODULE__, {:touch, Navigator, key})
-        decode(Navigator, nav)
+        :ets.update_element(LiveNavigator, key, [{3, now}])
+        GenServer.cast(__MODULE__, {:touch, LiveNavigator, key})
+        decode(LiveNavigator, nav)
 
       [{_key, prev_pid, _, _, _, _, _, _, _} = nav] ->
-        :ets.update_element(Navigator, key, [{2, pid}, {3, now}])
+        :ets.update_element(LiveNavigator, key, [{2, pid}, {3, now}])
         page_key =
-          case :ets.lookup(Navigator.PIDs, prev_pid) do
+          case :ets.lookup(LiveNavigator.PIDs, prev_pid) do
             [{_, _, page_key}] -> page_key
             _ -> nil
           end
-        :ets.insert(Navigator.PIDs, {pid, key, page_key})
-        :ets.delete(Navigator.PIDs, prev_pid)
+        :ets.insert(LiveNavigator.PIDs, {pid, key, page_key})
+        :ets.delete(LiveNavigator.PIDs, prev_pid)
         GenServer.cast(__MODULE__, {:ack, key})
-        GenServer.cast(__MODULE__, {:touch, Navigator, key})
-        decode(Navigator, nav)
+        GenServer.cast(__MODULE__, {:touch, LiveNavigator, key})
+        decode(LiveNavigator, nav)
 
       _ ->
-        nav = %Navigator{session_id: session_id, tab: tab}
-        :ets.insert(Navigator, encode_navigator(nav, pid, now))
-        :ets.insert(Navigator.PIDs, {pid, key, nil})
-        GenServer.cast(__MODULE__, {:insert, Navigator, key, Map.from_struct(nav)})
+        nav = %LiveNavigator{session_id: session_id, tab: tab}
+        :ets.insert(LiveNavigator, encode_navigator(nav, pid, now))
+        :ets.insert(LiveNavigator.PIDs, {pid, key, nil})
+        GenServer.cast(__MODULE__, {:insert, LiveNavigator, key, Map.from_struct(nav)})
         nav
     end
   end
@@ -102,23 +102,23 @@ defmodule Navigator.Controller do
 
       [{_key, prev_pid, _, _} = page] ->
         :ets.update_element(Page, key, [{2, pid}, {3, now}])
-        :ets.update_element(Navigator.PIDs, prev_pid, [{3, nil}])
-        :ets.update_element(Navigator.PIDs, pid, [{3, {view, action}}])
+        :ets.update_element(LiveNavigator.PIDs, prev_pid, [{3, nil}])
+        :ets.update_element(LiveNavigator.PIDs, pid, [{3, {view, action}}])
         GenServer.cast(__MODULE__, {:touch, Page, key})
         decode(Page, page)
 
       _ ->
         page = %Page{session_id: session_id, tab: tab, view: view, action: action}
         :ets.insert(Page, encode_page(page, pid, now))
-        :ets.update_element(Navigator.PIDs, pid, [{3, {view, action}}])
+        :ets.update_element(LiveNavigator.PIDs, pid, [{3, {view, action}}])
         GenServer.cast(__MODULE__, {:insert, Page, key, Map.from_struct(page)})
         page
     end
   end
 
-  @spec save(Navigator.t) :: Navigator.t
+  @spec save(LiveNavigator.t) :: LiveNavigator.t
   @spec save(Page.t) :: Page.t
-  def save(%module{__changed__: [_ | _] = changes} = entity) when module in [Navigator, Page] do
+  def save(%module{__changed__: [_ | _] = changes} = entity) when module in [LiveNavigator, Page] do
     changes = entity |> Map.from_struct() |> Map.take(changes)
     update = Enum.map(changes, & field(module, &1))
     key = key(entity)
@@ -129,7 +129,7 @@ defmodule Navigator.Controller do
   end
   def save(entity), do: entity
 
-  @spec select(Navigator, keyword) :: [Navigator.t]
+  @spec select(LiveNavigator, keyword) :: [LiveNavigator.t]
   @spec select(Page, keyword) :: [Page.t]
   def select(table, attrs) do
     table
@@ -144,13 +144,13 @@ defmodule Navigator.Controller do
     storage_timeout = Keyword.get(opts, :storage_timeout, @storage_timeout)
     ack_ttl = Keyword.get(opts, :ack_ttl, @ack_ttl)
 
-    :ets.new(Navigator, [:public, :named_table, read_concurrency: true])
+    :ets.new(LiveNavigator, [:public, :named_table, read_concurrency: true])
     :ets.new(Page, [:public, :named_table, read_concurrency: true])
-    :ets.new(Navigator.PIDs, [:public, :named_table, read_concurrency: true])
+    :ets.new(LiveNavigator.PIDs, [:public, :named_table, read_concurrency: true])
 
     now = now()
-    navs = Navigator |> Storage.select() |> Enum.map(& encode_navigator(&1, nil, now))
-    :ets.insert(Navigator, navs)
+    navs = LiveNavigator |> Storage.select() |> Enum.map(& encode_navigator(&1, nil, now))
+    :ets.insert(LiveNavigator, navs)
     pages = Page |> Storage.select() |> Enum.map(& encode_page(&1, nil, now))
     :ets.insert(Page, pages)
 
@@ -178,7 +178,7 @@ defmodule Navigator.Controller do
     {:noreply, st}
   end
   def handle_info(:store, %{updates: updates, touches: touches} = st) do
-    [Navigator, Page]
+    [LiveNavigator, Page]
     |> Enum.flat_map(fn table ->
       with keys when not is_nil(keys) <- Map.get(touches, table) do
         if MapSet.size(keys) > 0, do: Storage.touch(table, MapSet.to_list(keys))
@@ -194,7 +194,7 @@ defmodule Navigator.Controller do
     {:noreply, restart_storage(st)}
   end
   def handle_info({:DOWN, _ref, :process, pid, _reason}, %{ack_ttl: ack_ttl, acks: acks} = st) do
-    case :ets.lookup(Navigator.PIDs, pid) do
+    case :ets.lookup(LiveNavigator.PIDs, pid) do
       [{_, key, _}] ->
         timer = Process.send_after(self(), {:nack, pid, key}, ack_ttl * 1_000)
         {:noreply, %{st | acks: Map.put(acks, key, timer)}}
@@ -204,8 +204,8 @@ defmodule Navigator.Controller do
     end
   end
   def handle_info({:nack, pid, {session_id, tab} = key}, %{acks: acks} = st) do
-    :ets.delete(Navigator.PIDs, pid)
-    :ets.delete(Navigator, key)
+    :ets.delete(LiveNavigator.PIDs, pid)
+    :ets.delete(LiveNavigator, key)
     :ets.match_delete(Page, {{session_id, tab, :_, :_}, :_, :_, :_})
     Storage.cleanup([{session_id, tab}])
     {:noreply, %{st | acks: Map.delete(acks, key)}}
@@ -249,21 +249,21 @@ defmodule Navigator.Controller do
     {:noreply, %{st | touches: touches}}
   end
 
-  defp field(Navigator, {:url, v}), do: {4, v}
-  defp field(Navigator, {:view, v}), do: {5, v}
-  defp field(Navigator, {:action, v}), do: {6, v}
-  defp field(Navigator, {:awaiting, v}), do: {7, v}
-  defp field(Navigator, {:history, v}), do: {8, v}
-  defp field(Navigator, {:assigns, v}), do: {9, v}
+  defp field(LiveNavigator, {:url, v}), do: {4, v}
+  defp field(LiveNavigator, {:view, v}), do: {5, v}
+  defp field(LiveNavigator, {:action, v}), do: {6, v}
+  defp field(LiveNavigator, {:awaiting, v}), do: {7, v}
+  defp field(LiveNavigator, {:history, v}), do: {8, v}
+  defp field(LiveNavigator, {:assigns, v}), do: {9, v}
   defp field(Page, {:assigns, v}), do: {4, v}
 
-  defp key(%Navigator{session_id: session_id, tab: tab}), do: {session_id, tab}
+  defp key(%LiveNavigator{session_id: session_id, tab: tab}), do: {session_id, tab}
   defp key(%Page{session_id: session_id, tab: tab, view: view, action: action}), do: {session_id, tab, view, action}
 
-  defp keys(Navigator), do: ~w[session_id tab]a
+  defp keys(LiveNavigator), do: ~w[session_id tab]a
   defp keys(Page), do: ~w[session_id tab view action]a
 
-  defp fields(Navigator), do: ~w[pid ts url view action awaiting history assigns]a
+  defp fields(LiveNavigator), do: ~w[pid ts url view action awaiting history assigns]a
   defp fields(Page), do: ~w[pid ts assigns]a
 
   defp match_spec(table, fields) do
@@ -274,8 +274,8 @@ defmodule Navigator.Controller do
     List.to_tuple([key | fields])
   end
 
-  defp decode(Navigator, {{session_id, tab}, _pid, _ts, url, view, action, awaiting, history, assigns}) do
-    %Navigator{
+  defp decode(LiveNavigator, {{session_id, tab}, _pid, _ts, url, view, action, awaiting, history, assigns}) do
+    %LiveNavigator{
       session_id: session_id,
       tab: tab,
       url: url,
@@ -297,7 +297,7 @@ defmodule Navigator.Controller do
   end
 
   defp encode_navigator(
-    %Navigator{
+    %LiveNavigator{
       session_id: session_id,
       tab: tab,
       url: url,
@@ -332,7 +332,7 @@ defmodule Navigator.Controller do
   defp cleanup(%{nav_ttl: ttl} = st) do
     ts = now() - ttl
     spec = [{{:"$1", :"$2", :_, :_, :_, :_, :_, :_, :_}, [{:<, :"$2", ts}], [:"$1"]}]
-    to_delete = :ets.select(Navigator, spec)
+    to_delete = :ets.select(LiveNavigator, spec)
     Enum.each(to_delete, fn {session_id, tab} ->
       :ets.match_delete(Page, {{session_id, tab, :_, :_}, :_, :_})
     end)

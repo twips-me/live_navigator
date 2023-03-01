@@ -1,4 +1,4 @@
-defmodule Navigator do
+defmodule LiveNavigator do
   @moduledoc """
   This library improves
   [Phoenix LiveView](https://hexdocs.pm/phoenix_live_view/) navigation and adds
@@ -15,91 +15,93 @@ defmodule Navigator do
 
   Add library to dependencies
 
-      {:navigator, "~> 0.1", hex: :live_navigator}
+      {:live_navigator, "~> 0.1"}
 
-  Add `Navigator` to your application supervisor
+  Add `LiveNavigator` to your application supervisor
 
       children = [
         ...
-        Navigator,
+        LiveNavigator,
         ...
       ]
 
-  Add `Navigator.Plug` to your browser pipeline:
+  Add `LiveNavigator.Plug` to your browser pipeline:
 
       defmodule YourWebApp.Router do
         pipeline :browser do
           ...
-          Navigator.Plug
+          LiveNavigator.Plug
         end
       end
 
-  To detect different browser tabs Navigator needs to run some code on the
+  To detect different browser tabs LiveNavigator needs to run some code on the
   client side. So add the following to your `assets/package.json`:
 
   ```json
-  "navigator": "file:../../../deps/navigator",
+  "live_navigator": "file:../../../deps/live_navigator",
   ```
 
   And to your `assets/app.js`:
 
   ```js
-  import { initNavigator } from './navigator';
+  import { initNavigator } from './live_navigator';
 
   const liveSocket = new LiveSocket('/live', Socket, initNavigator({
     // your phoenix LiveSocket params here
   }));
   ```
 
-  Then use `Navigator` in your live views and `Navigator.Component` in your
-  live components (`Navigator.Component` is necessary only in those components
-  that are doing any kind of redirection or navigator/page assignments)
+  Then use `LiveNavigator` in your live views and `LiveNavigator.Component` in
+  your live components (`LiveNavigator.Component` is necessary only in those
+  components that are doing any kind of redirection or navigator/page
+  assignments)
 
       defmodule YourWebApp.ExampleLive do
         use YourWebApp, :live_view
-        use Navigator
+        use LiveNavigator
         ...
       end
 
       defmodule YourWebApp.Components.NavBar do
         use YourWebApp, :live_component
-        use Navigator.Component
+        use LiveNavigator.Component
         ...
       end
 
-  In case you are going to use Navigator for entire application it's better to
-  place usage into your app definitions:
+  In case you are going to use LiveNavigator for entire application it's better
+  to place usage into your app definitions:
 
       defmodule YourWebApp do
         def liver_view do
           quote do
             use Phoenix.LiveView
-            use Navigator
+            use LiveNavigator
           end
         end
 
         def live_component do
           quote do
             use Phoenix.LiveComponent
-            use Navigator.Component
+            use LiveNavigator.Component
           end
         end
       end
 
   Now you have few additional assign functions in your live views:
   `&assign_page/3`, `&assign_nav/3`, `&assign_page_new/3`, `&assign_nav_new/3`,
-  `&clear_page/2` and `&clear_nav/3`. All of them works with assigns. Navigator
-  introduces two application states: navigator state and page state. Navigator
-  state is a global application state that is unique for live views opened from
-  deffierent browser tab and different HTTP session (that is set up via cookies
-  usualy). Page state is a state that unique for different live view module and
-  live view action and with above conditions for navigator state. In other words
-  when user opens in browser one of your pages, lets say page `A` the new
-  navigator and page states created. That he navigates to different page `B` new
-  page state created (but page state `A` is not deleted). If he then backs to
-  page `A` it's state will be loaded into your assigns. While navigator state
-  stay same for all above operations. If user then opens any page in new browser
-  tab then all states including navigator state will be created from sсratch.
+  `&clear_page/2` and `&clear_nav/3`. All of them works with assigns.
+  LiveNavigator introduces two application states: navigator state and page
+  state. Navigator state is a global application state that is unique for live
+  views opened from deffierent browser tab and different HTTP session (that is
+  set up via cookies usualy). Page state is a state that unique for different
+  live view module and live view action and with above conditions for navigator
+  state. In other words when user opens in browser one of your pages, lets say
+  page `A` the new navigator and page states created. That he navigates to
+  different page `B` new page state created (but page state `A` is not deleted).
+  If he then backs to page `A` it's state will be loaded into your assigns.
+  While navigator state stay same for all above operations. If user then opens
+  any page in new browser tab then all states including navigator state will be
+  created from sсratch.
 
   To control user navigation you now has several additional callbacks in your
   live views: `&handle_page_refresh/2`, `&handle_page_leave/4` and
@@ -111,11 +113,11 @@ defmodule Navigator do
   `handle_params` callback and executed in live view process, but
   `&handle_page_leave/4` called in process of live view where user went and the
   only save functions here is the assign-related functions provided by
-  Navigator.
+  LiveNavigator.
   """
 
   alias IEx.History
-  alias Navigator.{Controller, History, Lifecycle, Page}
+  alias LiveNavigator.{Controller, History, Lifecycle, Page}
   alias Phoenix.{Component, LiveView}
   alias Phoenix.LiveView.Socket
 
@@ -194,16 +196,16 @@ defmodule Navigator do
   Called when user moves from another page to this one. This function unlike
   `&handle_page_refresh/2` and `&handle_page_enter/4` called from another
   process and have no access to socket. The only safe functions here is the
-  assets-related functions provided by `Navigator`. Arguments are the same as
-  in `&handle_page_enter/4` except that the last argument is the `Navigator`
-  object instead of `Socket`. This function must return
-  `{:noreply, Navigator.t}` tuple
+  assets-related functions provided by `LiveNavigator`. Arguments are the same
+  as in `&handle_page_enter/4` except that the last argument is the
+  `LiveNavigator` object instead of `Socket`. This function must return
+  `{:noreply, LiveNavigator.t}` tuple
   """
   @callback handle_page_leave(action_spec, History.spec, History.spec, t) :: {:noreply, t}
 
-  @app :navigator
+  @app :live_navigator
   @session_key Application.compile_env(@app, :session_key, @app)
-  @tab_key to_string(Application.compile_env(@app, :tab_key, "_navigator_tab"))
+  @tab_key to_string(Application.compile_env(@app, :tab_key, "_live_navigator_tab"))
   @navigator @app
 
   @spec start_link() :: Supervisor.on_start
@@ -226,7 +228,7 @@ defmodule Navigator do
     quote do
       @behaviour unquote(__MODULE__)
       @before_compile unquote(__MODULE__)
-      @navigator_fallback_url unquote(fallback_url)
+      @live_navigator_fallback_url unquote(fallback_url)
 
       import unquote(LiveView), except: [
         push_navigate: 2,
@@ -280,7 +282,7 @@ defmodule Navigator do
   @spec __before_compile__(Macro.Env.t) :: Macro.t
   defmacro __before_compile__(env) do
     lifecycle = Lifecycle.lifecycle(env)
-    fallback_url = Module.get_attribute(env.module, :navigator_fallback_url)
+    fallback_url = Module.get_attribute(env.module, :live_navigator_fallback_url)
     quote do
       def __navigator__(:lifecycle), do: unquote(lifecycle)
       def __navigator__(:fallback_url), do: unquote(fallback_url)
@@ -290,7 +292,7 @@ defmodule Navigator do
   @spec fallback_url(nil | atom | binary) :: Macro.t
   defmacro fallback_url(url) when is_nil(url) or is_atom(url) or is_binary(url) do
     quote do
-      @navigator_fallback_url unquote(url)
+      @live_navigator_fallback_url unquote(url)
     end
   end
 
@@ -329,7 +331,7 @@ defmodule Navigator do
             Controller.load_page(session_id, tab, view, action)
           }
 
-        %Navigator{session_id: session_id, tab: tab} = navigator when is_binary(session_id) and is_integer(tab) ->
+        %__MODULE__{session_id: session_id, tab: tab} = navigator when is_binary(session_id) and is_integer(tab) ->
           {
             navigator,
             Controller.load_page(session_id, tab, view, action)
@@ -339,11 +341,9 @@ defmodule Navigator do
       socket
       |> put_navigator(navigator)
       |> apply_assigns(navigator)
-    {navigator, actions} = checkout_navigator(navigator, url, view, action)
-    socket =
-      socket
-      |> put_navigator(navigator)
       |> apply_assigns(page)
+    {navigator, actions} = checkout_navigator(navigator, url, view, action)
+    socket = put_navigator(socket, navigator)
     case Enum.reduce_while(actions, socket, &run_callback/2) do
       %Socket{redirected: nil} = socket -> {:cont, socket}
       socket -> {:halt, socket}
@@ -816,11 +816,11 @@ defmodule Navigator do
   end
 
   defp attach_handle_params(socket) do
-    LiveView.attach_hook(socket, :navigator_handle_params, :handle_params, &handle_params/3)
+    LiveView.attach_hook(socket, :live_navigator_handle_params, :handle_params, &handle_params/3)
   end
 
   defp attach_handle_info(socket) do
-    LiveView.attach_hook(socket, :navigator_handle_info, :handle_info, &handle_info/2)
+    LiveView.attach_hook(socket, :live_navigator_handle_info, :handle_info, &handle_info/2)
   end
 
   defp apply_assigns(%Socket{} = socket, %{assigns: assigns}), do: Component.assign(socket, assigns)

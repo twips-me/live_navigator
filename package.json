@@ -1,11 +1,11 @@
 {
   "name": "live_navigator",
   "version": "0.1.1",
-  "description": "Navigator JS files",
+  "description": "LiveNavigator JS files",
   "license": "MIT",
-  "module": "./dist/navigator.js",
+  "module": "./dist/live_navigator.js",
   "exports": {
-    "import": "./dist/navigator.js"
+    "import": "./dist/live_navigator.js"
   },
   "files": [
     "package.json",

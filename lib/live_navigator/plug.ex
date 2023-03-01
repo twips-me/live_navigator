@@ -1,13 +1,13 @@
-defmodule Navigator.Plug do
+defmodule LiveNavigator.Plug do
   @moduledoc """
-  Phoenix plug that is necessary for Navigator
+  Phoenix plug that is necessary for LiveNavigator
   """
 
   @behaviour Plug
 
   import Plug.Conn
 
-  @app :navigator
+  @app :live_navigator
   @default_session_key @app
 
   @impl true

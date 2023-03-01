@@ -1,4 +1,4 @@
-defmodule Navigator.Page do
+defmodule LiveNavigator.Page do
   @moduledoc """
   Application page state
   """

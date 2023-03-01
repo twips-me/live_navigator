@@ -1,4 +1,4 @@
-defmodule Navigator.History do
+defmodule LiveNavigator.History do
   @moduledoc """
   User navigation history
   """
@@ -30,11 +30,11 @@ defmodule Navigator.History do
   @enforce_keys ~w[id view action url]a
   defstruct ~w[id view action url name]a
 
-  @spec new(Navigator.t) :: spec
-  @spec new(Navigator.t, name) :: spec
+  @spec new(LiveNavigator.t) :: spec
+  @spec new(LiveNavigator.t, name) :: spec
   @spec new(url, view, action) :: spec
   @spec new(url, view, action, name) :: spec
-  def new(%Navigator{} = navigator, name \\ nil) do
+  def new(%LiveNavigator{} = navigator, name \\ nil) do
     fields =
       navigator
       |> Map.take(~w[url view action]a)

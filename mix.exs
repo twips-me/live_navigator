@@ -1,12 +1,12 @@
-defmodule Navigator.MixProject do
+defmodule LiveNavigator.MixProject do
   use Mix.Project
 
   def project do
     [
-      app: :navigator,
-      version: "0.1.1",
+      app: :live_navigator,
+      version: "0.1.2",
       elixir: "~> 1.14",
-      source_url: "https://github.com/twips-me/navigator",
+      source_url: "https://github.com/twips-me/live_navigator",
       homepage_url: "https://hex.pm/packages/live_navigator",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
@@ -38,7 +38,7 @@ defmodule Navigator.MixProject do
 
   defp docs do
     [
-      main: "Navigator",
+      main: "LiveNavigator",
       extras: ["README.md"],
     ]
   end
@@ -54,7 +54,7 @@ defmodule Navigator.MixProject do
       name: "live_navigator",
       files: ~w[lib dist .formatter.exs mix.exs package.json README* LICENSE*],
       licenses: ["Apache-2.0"],
-      links: %{"GitHub" => "https://github.com/twips-me/navigator"},
+      links: %{"GitHub" => "https://github.com/twips-me/live_navigator"},
     ]
   end
 
@@ -63,7 +63,7 @@ defmodule Navigator.MixProject do
       "assets.build": [
         "cmd rm -rf assets/node_modules",
         "cmd --cd assets npm install --quite",
-        "esbuild --runtime-config default assets/js/navigator.js --minify --format=esm --outdir=dist",
+        "esbuild --runtime-config default assets/js/live_navigator.js --minify --format=esm --outdir=dist",
       ],
     ]
   end
@@ -72,7 +72,7 @@ defmodule Navigator.MixProject do
       "assets.build": [
         "cmd rm -rf assets/node_modules",
         "cmd --cd assets npm install --quite",
-        "esbuild --runtime-config default assets/js/navigator.js --format=esm --outdir=dist",
+        "esbuild --runtime-config default assets/js/live_navigator.js --format=esm --outdir=dist",
       ],
     ]
   end

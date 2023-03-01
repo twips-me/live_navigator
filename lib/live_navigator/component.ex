@@ -1,9 +1,9 @@
-defmodule Navigator.Component do
+defmodule LiveNavigator.Component do
   @moduledoc """
-  Navigator functionality for `Phoenix.LiveComponent`
+  LiveNavigator functionality for `Phoenix.LiveComponent`
   """
 
-  alias Navigator.{Controller, History}
+  alias LiveNavigator.{Controller, History}
   alias Phoenix.LiveView
   alias Phoenix.LiveView.Socket
 
@@ -86,7 +86,7 @@ defmodule Navigator.Component do
   def redirect(socket, opts), do: LiveView.redirect(socket, opts)
 
   @spec nav_back(Socket.t) :: Socket.t
-  @spec nav_back(Socket.t, Navigator.back_index | keyword) :: Socket.t
+  @spec nav_back(Socket.t, LiveNavigator.back_index | keyword) :: Socket.t
   def nav_back(socket, opts \\ [])
   def nav_back(socket, to) when not is_list(to), do: nav_back(socket, to: to)
   def nav_back(%Socket{root_pid: pid} = socket, opts) do
@@ -100,7 +100,7 @@ defmodule Navigator.Component do
           _ -> {-2, false}
         end
       navigator
-      |> Navigator.navigate_back(History.find(history, index), unstack)
+      |> LiveNavigator.navigate_back(History.find(history, index), unstack)
       |> apply_awaiting(socket, opts[:navigate])
     end)
   end
@@ -112,7 +112,7 @@ defmodule Navigator.Component do
   def nav_pop_stack(%Socket{root_pid: pid} = socket, opts) do
     with_navigator(pid, socket, fn %{history: history} = navigator, socket ->
       navigator
-      |> Navigator.navigate_back(History.stack_preceding(history), false)
+      |> LiveNavigator.navigate_back(History.stack_preceding(history), false)
       |> apply_awaiting(socket, opts[:navigate])
     end)
   end
@@ -126,7 +126,7 @@ defmodule Navigator.Component do
   @spec assign_page(Socket.t, atom, any) :: Socket.t
   def assign_page(%Socket{root_pid: pid} = socket, key, value) when is_pid(pid) and is_atom(key) do
     with_navigator(pid, socket, fn navigator, socket ->
-      Navigator.update_page_assigns(navigator, [{key, value}], [])
+      LiveNavigator.update_page_assigns(navigator, [{key, value}], [])
       notify_view(pid, [:page])
       socket
     end)
@@ -139,7 +139,7 @@ defmodule Navigator.Component do
   @spec assign_page(Socket.t, keyword | map) :: Socket.t
   def assign_page(%Socket{root_pid: pid} = socket, assigns) when is_pid(pid) do
     with_navigator(pid, socket, fn navigator, socket ->
-      Navigator.update_page_assigns(navigator, assigns, [])
+      LiveNavigator.update_page_assigns(navigator, assigns, [])
       notify_view(pid, [:page])
       socket
     end)
@@ -152,7 +152,7 @@ defmodule Navigator.Component do
   @spec assign_nav(Socket.t, atom, any) :: Socket.t
   def assign_nav(%Socket{root_pid: pid} = socket, key, value) when is_pid(pid) and is_atom(key) do
     with_navigator(pid, socket, fn navigator, socket ->
-      Navigator.update_nav_assigns(navigator, [{key, value}], [])
+      LiveNavigator.update_nav_assigns(navigator, [{key, value}], [])
       notify_view(pid, [:navigator])
       socket
     end)
@@ -165,7 +165,7 @@ defmodule Navigator.Component do
   @spec assign_nav(Socket.t, keyword | map) :: Socket.t
   def assign_nav(%Socket{root_pid: pid} = socket, assigns) when is_pid(pid) do
     with_navigator(pid, socket, fn navigator, socket ->
-      Navigator.update_nav_assigns(navigator, assigns, [])
+      LiveNavigator.update_nav_assigns(navigator, assigns, [])
       notify_view(pid, [:navigator])
       socket
     end)
@@ -178,7 +178,7 @@ defmodule Navigator.Component do
   @spec clear_page(Socket.t, atom | [atom]) :: Socket.t
   def clear_page(%Socket{root_pid: pid} = socket, keys) do
     with_navigator(pid, socket, fn navigator, socket ->
-      Navigator.update_page_assigns(navigator, [], keys)
+      LiveNavigator.update_page_assigns(navigator, [], keys)
       notify_view(pid, [:page])
       socket
     end)
@@ -193,7 +193,7 @@ defmodule Navigator.Component do
   @spec clear_nav(Socket.t, atom | [atom]) :: Socket.t
   def clear_nav(%Socket{root_pid: pid} = socket, keys) do
     with_navigator(pid, socket, fn navigator, socket ->
-      Navigator.update_nav_assigns(navigator, [], keys)
+      LiveNavigator.update_nav_assigns(navigator, [], keys)
       notify_view(pid, [:navigator])
       socket
     end)
@@ -208,7 +208,7 @@ defmodule Navigator.Component do
   @spec history(Socket.t) :: History.t
   def history(%Socket{root_pid: pid}) do
     case Controller.get_navigator(pid) do
-      %Navigator{history: history} -> history
+      %LiveNavigator{history: history} -> history
       _ -> []
     end
   end
@@ -217,7 +217,7 @@ defmodule Navigator.Component do
   @doc """
 
   """
-  @spec navigator(Socket.t) :: Navigator.t | nil
+  @spec navigator(Socket.t) :: LiveNavigator.t | nil
   def navigator(%Socket{root_pid: pid}), do: Controller.get_navigator(pid)
   def navigator(_), do: nil
 
@@ -227,7 +227,7 @@ defmodule Navigator.Component do
   @spec current_url(Socket.t) :: binary | nil
   def current_url(%Socket{root_pid: pid}) do
     case Controller.get_navigator(pid) do
-      %Navigator{url: url} -> url
+      %LiveNavigator{url: url} -> url
       _ -> nil
     end
   end
@@ -241,10 +241,10 @@ defmodule Navigator.Component do
   def nav_back_url(socket, index \\ -2)
   def nav_back_url(%Socket{root_pid: pid}, index) do
     case Controller.get_navigator(pid) do
-      %Navigator{view: view, history: history} ->
+      %LiveNavigator{view: view, history: history} ->
         case History.find(history, index) do
-          %{url: url} -> Navigator.url_path(url)
-          _ -> Navigator.get_fallback_url(view)
+          %{url: url} -> LiveNavigator.url_path(url)
+          _ -> LiveNavigator.get_fallback_url(view)
         end
 
       _ ->
@@ -259,10 +259,10 @@ defmodule Navigator.Component do
   @spec nav_pop_stack_url(Socket.t) :: binary | nil
   def nav_pop_stack_url(%Socket{root_pid: pid}) do
     case Controller.get_navigator(pid) do
-      %Navigator{view: view, history: history} ->
+      %LiveNavigator{view: view, history: history} ->
         case History.stack_preceding(history) do
-          %{url: url} -> Navigator.url_path(url)
-          _ -> Navigator.get_fallback_url(view)
+          %{url: url} -> LiveNavigator.url_path(url)
+          _ -> LiveNavigator.get_fallback_url(view)
         end
 
       _ ->
@@ -273,30 +273,30 @@ defmodule Navigator.Component do
 
   defp navigate_forward(pid, action, opts) do
     case Controller.get_navigator(pid) do
-      %Navigator{} = navigator -> navigator |> Navigator.navigate_forward(action, opts)
+      %LiveNavigator{} = navigator -> LiveNavigator.navigate_forward(navigator, action, opts)
       _ -> :ok
     end
   end
 
   defp with_navigator(pid, socket, fun) do
     case Controller.get_navigator(pid) do
-      %Navigator{} = navigator -> fun.(navigator, socket)
+      %LiveNavigator{} = navigator -> fun.(navigator, socket)
       _ -> socket
     end
   end
 
   defp apply_awaiting(_navigator, socket, false), do: socket
   defp apply_awaiting(%{awaiting: {%{method: :patch}, to, _}}, socket, _) do
-    LiveView.push_patch(socket, to: Navigator.url_path(to))
+    LiveView.push_patch(socket, to: LiveNavigator.url_path(to))
   end
   defp apply_awaiting(%{awaiting: {%{method: :navigate}, to, _}}, socket, _) do
-    LiveView.push_navigate(socket, to: Navigator.url_path(to))
+    LiveView.push_navigate(socket, to: LiveNavigator.url_path(to))
   end
   defp apply_awaiting(%{awaiting: {%{method: :redirect}, to, _}}, socket, _) do
-    LiveView.redirect(socket, to: Navigator.url_path(to))
+    LiveView.redirect(socket, to: LiveNavigator.url_path(to))
   end
 
   defp notify_view(pid, updates) do
-    send(pid, {Navigator, :reload, updates})
+    send(pid, {LiveNavigator, :reload, updates})
   end
 end
