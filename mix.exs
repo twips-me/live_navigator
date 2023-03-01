@@ -4,7 +4,7 @@ defmodule LiveNavigator.MixProject do
   def project do
     [
       app: :live_navigator,
-      version: "0.1.2",
+      version: "0.1.3",
       elixir: "~> 1.14",
       source_url: "https://github.com/twips-me/live_navigator",
       homepage_url: "https://hex.pm/packages/live_navigator",
