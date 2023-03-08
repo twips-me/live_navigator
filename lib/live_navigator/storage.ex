@@ -30,6 +30,8 @@ defmodule LiveNavigator.Storage do
     @spec touch(LiveNavigator | Page, list) :: :ok
     def touch(_table, _keys), do: :ok
   else
+    Code.ensure_loaded!(@storage)
+
     @spec update([LiveNavigator.t | Page.t]) :: :ok
     defdelegate update(entities), to: @storage
 

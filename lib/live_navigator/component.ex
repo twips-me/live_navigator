@@ -110,10 +110,18 @@ defmodule LiveNavigator.Component do
   @spec nav_pop_stack(Socket.t, keyword) :: Socket.t
   def nav_pop_stack(socket, opts \\ [])
   def nav_pop_stack(%Socket{root_pid: pid} = socket, opts) do
-    with_navigator(pid, socket, fn %{history: history} = navigator, socket ->
-      navigator
-      |> LiveNavigator.navigate_back(History.stack_preceding(history), false)
-      |> apply_awaiting(socket, opts[:navigate])
+    with_navigator(pid, socket, fn
+      %{history: history} = navigator, socket when length(history) >= 2 ->
+        navigator
+        |> LiveNavigator.navigate_back(History.stack_preceding(history), false)
+        |> apply_awaiting(socket, opts[:navigate])
+
+      %{view: view} = navigator, socket ->
+        navigator
+        |> LiveNavigator.update(:history, [])
+        |> Controller.save()
+        url = LiveNavigator.get_fallback_url(view)
+        LiveView.push_navigate(socket, to: LiveNavigator.url_path(url))
     end)
   end
   def nav_pop_stack(socket, _), do: socket

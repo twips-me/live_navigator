@@ -8,7 +8,7 @@ defmodule LiveNavigator.Lifecycle do
   @spec __using__(keyword) :: Macro.t
   defmacro __using__(_opts) do
     quote do
-      Module.register_attribute(__MODULE__, :live_live_navigator_lifecycle, accumulate: true)
+      Module.register_attribute(__MODULE__, :live_navigator_lifecycle, accumulate: true)
       import unquote(__MODULE__), only: [
         on_page_enter: 1,
         on_page_enter: 2,

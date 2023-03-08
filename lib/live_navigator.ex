@@ -204,8 +204,8 @@ defmodule LiveNavigator do
   @callback handle_page_leave(action_spec, History.spec, History.spec, t) :: {:noreply, t}
 
   @app :live_navigator
-  @session_key Application.compile_env(@app, :session_key, @app)
-  @tab_key to_string(Application.compile_env(@app, :tab_key, "_live_navigator_tab"))
+  @session_key to_string(Application.compile_env(@app, :session_key, @app))
+  # @tab_key to_string(Application.compile_env(@app, :tab_key, "_live_navigator_tab"))
   @navigator @app
 
   @spec start_link() :: Supervisor.on_start
@@ -297,24 +297,35 @@ defmodule LiveNavigator do
   end
 
   @spec on_mount(any, map, map, Socket.t) :: {:cont, Socket.t}
-  def on_mount(_args, _params, session, socket) do
+  def on_mount(_args, _params, %{@session_key => nav_id}, socket) when is_binary(nav_id) and byte_size(nav_id) > 0 do
     socket =
-      if LiveView.connected?(socket) do
-        case {Map.get(session, to_string(@session_key)), LiveView.get_connect_params(socket)} do
-          {nav_id, %{@tab_key => tab}} when is_binary(nav_id) and is_integer(tab) and tab > 0 ->
-            socket
-            |> put_navigator({nav_id, tab})
-            |> attach_handle_params()
-            |> attach_handle_info()
-
-          _ ->
-            socket
-        end
-      else
-        socket
-      end
+      socket
+      |> put_navigator({nav_id, 0})
+      |> attach_handle_params()
+      |> attach_handle_info()
     {:cont, socket}
   end
+  def on_mount(_args, _params, _session, socket) do
+    {:cont, socket}
+  end
+  # def on_mount(_args, _params, session, socket) do
+  #   socket =
+  #     if LiveView.connected?(socket) do
+  #       case {Map.get(session, to_string(@session_key)), LiveView.get_connect_params(socket)} do
+  #         {nav_id, %{@tab_key => tab}} when is_binary(nav_id) and is_integer(tab) and tab > 0 ->
+  #           socket
+  #           |> put_navigator({nav_id, tab})
+  #           |> attach_handle_params()
+  #           |> attach_handle_info()
+
+  #         _ ->
+  #           socket
+  #       end
+  #     else
+  #       socket
+  #     end
+  #   {:cont, socket}
+  # end
 
   @spec handle_params(map, binary, Socket.t) :: {:cont | :halt, Socket.t}
   def handle_params(
@@ -325,7 +336,7 @@ defmodule LiveNavigator do
     action = Map.get(assigns, :live_action)
     {navigator, page} =
       case navigator do
-        {session_id, tab} when is_binary(session_id) and is_integer(tab) and tab > 0 ->
+        {session_id, tab} when is_binary(session_id) and is_integer(tab) -> # and tab > 0 ->
           {
             Controller.load_navigator(session_id, tab),
             Controller.load_page(session_id, tab, view, action)
@@ -364,6 +375,47 @@ defmodule LiveNavigator do
     {:halt, socket}
   end
   def handle_info(_, socket) do
+    {:cont, socket}
+  end
+
+  def handle_event(
+    "lv:put-awaiting",
+    %{"method" => method, "to" => to} = params,
+    %Socket{private: %{@navigator => %__MODULE__{} = navigator}} = socket
+  ) when method in ~w[navigate patch] and is_binary(to) do
+    method = String.to_existing_atom(method)
+    opts = []
+    opts =
+      case params do
+        %{"stack" => true} -> Keyword.put(opts, :stack, true)
+        %{"stack" => "new"} -> Keyword.put(opts, :stack, :new)
+        _ -> opts
+      end
+    opts =
+      case params do
+        %{"replace" => true} -> Keyword.put(opts, :replace, true)
+        %{"replace" => idx} when is_integer(idx) -> Keyword.put(opts, :replace, idx)
+        %{"replace" => name} when is_binary(name) -> Keyword.put(opts, :replace, String.to_existing_atom(name))
+        _ -> opts
+      end
+    spec = push_action_spec(navigator, method, opts)
+    put_awaiting(navigator, to, spec)
+    {:halt, socket}
+  end
+  def handle_event("ln:back", params, socket) do
+    unstack = Map.get(params, "unstack") == true
+    opts =
+      case params do
+        %{"to" => to} when is_integer(to) -> [to: {to, unstack}]
+        %{"to" => to} when is_binary(to) -> [to: {String.to_existing_atom(to), unstack}]
+        _ -> []
+      end
+    {:halt, nav_back(socket, opts)}
+  end
+  def handle_event("ln:pop_stack", _params, socket) do
+    {:halt, nav_pop_stack(socket, [])}
+  end
+  def handle_event(_event, _data, socket) do
     {:cont, socket}
   end
 
@@ -595,6 +647,11 @@ defmodule LiveNavigator do
 
   """
   @spec nav_pop_stack_url(Socket.t) :: binary | nil
+  def nav_pop_stack_url(
+    %Socket{private: %{@navigator => %__MODULE__{view: view, history: history}}}
+  ) when length(history) < 2 do
+    get_fallback_url(view)
+  end
   def nav_pop_stack_url(%Socket{private: %{@navigator => %__MODULE__{view: view, history: history}}}) do
     case History.stack_preceding(history) do
       %{url: url} -> url_path(url)
@@ -628,11 +685,22 @@ defmodule LiveNavigator do
   @spec nav_pop_stack(Socket.t) :: Socket.t
   @spec nav_pop_stack(Socket.t, keyword) :: Socket.t
   def nav_pop_stack(socket, opts \\ [])
-  def nav_pop_stack(%Socket{private: %{@navigator => %__MODULE__{history: history} = navigator}} = socket, opts) do
+  def nav_pop_stack(
+    %Socket{private: %{@navigator => %__MODULE__{history: history} = navigator}} = socket,
+    opts
+  ) when length(history) >= 2 do
     spec = with nil <- History.stack_preceding(history), do: History.find(history, -1)
     navigator
     |> navigate_back(spec, true)
     |> apply_awaiting(socket, opts[:navigate])
+  end
+  def nav_pop_stack(%Socket{private: %{@navigator => %__MODULE__{view: view} = navigator}} = socket, _opts) do
+    url = get_fallback_url(view)
+    navigator = update(navigator, :history, [])
+    Controller.save(navigator)
+    socket
+    |> put_navigator(navigator)
+    |> LiveView.push_navigate(to: url_path(url))
   end
   def nav_pop_stack(socket, _opts), do: socket
 
