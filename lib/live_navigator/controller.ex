@@ -40,13 +40,17 @@ defmodule LiveNavigator.Controller do
   end
 
   @spec get_page() :: Page.t | nil
-  @spec get_page(pid) :: Page.t | nil
+  @spec get_page(pid | LiveNavigator.t) :: Page.t | nil
   @spec get_page(session_id, tab, view, action) :: Page.t | nil
-  def get_page(pid \\ self()) do
+  def get_page(pid \\ self())
+  def get_page(pid) when is_pid(pid) do
     case :ets.lookup(LiveNavigator.PIDs, pid) do
       [{_pid, {session_id, tab}, {view, action}}] -> get_page(session_id, tab, view, action)
       _ -> nil
     end
+  end
+  def get_page(%LiveNavigator{session_id: session_id, tab: tab, view: view, action: action}) do
+    get_page(session_id, tab, view, action)
   end
   def get_page(session_id, tab, view, action) do
     case :ets.lookup(Page, {session_id, tab, view, action}) do
@@ -95,12 +99,12 @@ defmodule LiveNavigator.Controller do
     pid = self()
     key = {session_id, tab, view, action}
     case :ets.lookup(Page, key) do
-      [{_key, ^pid, _, _} = page] ->
+      [{_key, ^pid, _, _, _} = page] ->
         :ets.update_element(Page, key, [{3, now}])
         GenServer.cast(__MODULE__, {:touch, Page, key})
         decode(Page, page)
 
-      [{_key, prev_pid, _, _} = page] ->
+      [{_key, prev_pid, _, _, _} = page] ->
         :ets.update_element(Page, key, [{2, pid}, {3, now}])
         :ets.update_element(LiveNavigator.PIDs, prev_pid, [{3, nil}])
         :ets.update_element(LiveNavigator.PIDs, pid, [{3, {view, action}}])
@@ -256,6 +260,7 @@ defmodule LiveNavigator.Controller do
   defp field(LiveNavigator, {:history, v}), do: {8, v}
   defp field(LiveNavigator, {:assigns, v}), do: {9, v}
   defp field(Page, {:assigns, v}), do: {4, v}
+  defp field(Page, {:fallback_url, v}), do: {5, v}
 
   defp key(%LiveNavigator{session_id: session_id, tab: tab}), do: {session_id, tab}
   defp key(%Page{session_id: session_id, tab: tab, view: view, action: action}), do: {session_id, tab, view, action}
@@ -264,7 +269,7 @@ defmodule LiveNavigator.Controller do
   defp keys(Page), do: ~w[session_id tab view action]a
 
   defp fields(LiveNavigator), do: ~w[pid ts url view action awaiting history assigns]a
-  defp fields(Page), do: ~w[pid ts assigns]a
+  defp fields(Page), do: ~w[pid ts assigns fallback_url]a
 
   defp match_spec(table, fields) do
     keys = keys(table)
@@ -286,13 +291,14 @@ defmodule LiveNavigator.Controller do
       assigns: assigns,
     }
   end
-  defp decode(Page, {{session_id, tab, view, action}, _pid, _ts, assigns}) do
+  defp decode(Page, {{session_id, tab, view, action}, _pid, _ts, assigns, fallback_url}) do
     %Page{
       session_id: session_id,
       tab: tab,
       view: view,
       action: action,
       assigns: assigns,
+      fallback_url: fallback_url,
     }
   end
 
@@ -320,11 +326,12 @@ defmodule LiveNavigator.Controller do
       view: view,
       action: action,
       assigns: assigns,
+      fallback_url: fallback_url
     },
     pid,
     ts
   ) do
-    {{session_id, tab, view, action}, pid, ts, assigns}
+    {{session_id, tab, view, action}, pid, ts, assigns, fallback_url}
   end
 
   defp now, do: NaiveDateTime.utc_now() |> NaiveDateTime.to_gregorian_seconds() |> elem(0)
@@ -334,7 +341,7 @@ defmodule LiveNavigator.Controller do
     spec = [{{:"$1", :"$2", :_, :_, :_, :_, :_, :_, :_}, [{:<, :"$2", ts}], [:"$1"]}]
     to_delete = :ets.select(LiveNavigator, spec)
     Enum.each(to_delete, fn {session_id, tab} ->
-      :ets.match_delete(Page, {{session_id, tab, :_, :_}, :_, :_})
+      :ets.match_delete(Page, {{session_id, tab, :_, :_}, :_, :_, :_})
     end)
     Storage.cleanup(to_delete)
     st

@@ -111,16 +111,15 @@ defmodule LiveNavigator.Component do
   def nav_pop_stack(socket, opts \\ [])
   def nav_pop_stack(%Socket{root_pid: pid} = socket, opts) do
     with_navigator(pid, socket, fn
-      %{history: history} = navigator, socket when length(history) >= 2 ->
+      %LiveNavigator{history: history} = navigator, socket when length(history) >= 2 ->
         navigator
         |> LiveNavigator.navigate_back(History.stack_preceding(history), false)
         |> apply_awaiting(socket, opts[:navigate])
 
-      %{view: view} = navigator, socket ->
+      %LiveNavigator{fallback_url: url} = navigator, socket ->
         navigator
         |> LiveNavigator.update(:history, [])
         |> Controller.save()
-        url = LiveNavigator.get_fallback_url(view)
         LiveView.push_navigate(socket, to: LiveNavigator.url_path(url))
     end)
   end
@@ -249,10 +248,10 @@ defmodule LiveNavigator.Component do
   def nav_back_url(socket, index \\ -2)
   def nav_back_url(%Socket{root_pid: pid}, index) do
     case Controller.get_navigator(pid) do
-      %LiveNavigator{view: view, history: history} ->
+      %LiveNavigator{history: history, fallback_url: fallback_url} ->
         case History.find(history, index) do
           %{url: url} -> LiveNavigator.url_path(url)
-          _ -> LiveNavigator.get_fallback_url(view)
+          _ -> fallback_url
         end
 
       _ ->
@@ -267,10 +266,10 @@ defmodule LiveNavigator.Component do
   @spec nav_pop_stack_url(Socket.t) :: binary | nil
   def nav_pop_stack_url(%Socket{root_pid: pid}) do
     case Controller.get_navigator(pid) do
-      %LiveNavigator{view: view, history: history} ->
+      %LiveNavigator{history: history, fallback_url: fallback_url} ->
         case History.stack_preceding(history) do
           %{url: url} -> LiveNavigator.url_path(url)
-          _ -> LiveNavigator.get_fallback_url(view)
+          _ -> fallback_url
         end
 
       _ ->

@@ -139,8 +139,6 @@ defmodule LiveNavigator do
     optional(:to) => non_neg_integer | atom,
   }
 
-  @type assign_new_callback :: (-> any) | (map -> any)
-
   @type session_id :: binary
   @type tab :: integer
   @type url :: binary
@@ -148,7 +146,9 @@ defmodule LiveNavigator do
   @type action :: atom
   @type changes :: [atom]
   @type assigns :: map
-  @type field :: :session_id | :tab | :url | :view | :action | :awaiting | :history | :assigns
+  @type field :: :session_id | :tab | :url | :view | :action | :awaiting | :history | :assigns | :fallback_url
+
+  @type assign_new_callback :: (-> any) | (map -> any)
 
   @type t :: %__MODULE__{
     session_id: session_id,
@@ -159,6 +159,7 @@ defmodule LiveNavigator do
     awaiting: tuple | nil,
     history: History.t,
     assigns: assigns,
+    fallback_url: url | nil,
     __changed__: changes,
   }
 
@@ -170,6 +171,7 @@ defmodule LiveNavigator do
     view: nil,
     action: nil,
     awaiting: nil,
+    fallback_url: "/",
     history: [],
     assigns: %{},
     __changed__: [],
@@ -259,6 +261,7 @@ defmodule LiveNavigator do
         push_patch: 2,
         push_redirect: 2,
         redirect: 2,
+        set_fallback_url: 2,
       ]
       on_mount unquote(__MODULE__)
 
@@ -348,12 +351,12 @@ defmodule LiveNavigator do
             Controller.load_page(session_id, tab, view, action)
           }
       end
-    %Socket{private: %{@navigator => navigator}} = socket =
+    socket =
       socket
-      |> put_navigator(navigator)
       |> apply_assigns(navigator)
       |> apply_assigns(page)
     {navigator, actions} = checkout_navigator(navigator, url, view, action)
+    navigator = put_fallback_url(navigator, page, socket)
     socket = put_navigator(socket, navigator)
     case Enum.reduce_while(actions, socket, &run_callback/2) do
       %Socket{redirected: nil} = socket -> {:cont, socket}
@@ -419,7 +422,7 @@ defmodule LiveNavigator do
     {:cont, socket}
   end
 
-  @simple_fields ~w[session_id tab url view action]a
+  @simple_fields ~w[session_id tab url view action fallback_url]a
   @complex_fields ~w[awaiting history assigns]a
 
   @spec update(t, map | keyword) :: t
@@ -435,6 +438,19 @@ defmodule LiveNavigator do
   end
   def update(navigator, fields) do
     Enum.reduce(fields, navigator, fn {field, value}, navigator -> update(navigator, field, value) end)
+  end
+
+  @spec set_fallback_url(Socket.t, url | nil) :: Socket.t
+  @spec set_fallback_url(t, url | nil) :: t
+  def set_fallback_url(%Socket{private: %{@navigator => %__MODULE__{} = navigator}} = socket, url) do
+    navigator = set_fallback_url(navigator, url)
+    put_navigator(socket, navigator)
+  end
+  def set_fallback_url(%__MODULE__{} = navigator, url) do
+    with %Page{} = page <- Controller.get_page(navigator) do
+      page |> Page.update(:fallback_url, url) |> Controller.save()
+    end
+    %{navigator | fallback_url: url}
   end
 
   @doc """
@@ -635,10 +651,13 @@ defmodule LiveNavigator do
   @spec nav_back_url(Socket.t) :: binary | nil
   @spec nav_back_url(Socket.t, History.index) :: binary | nil
   def nav_back_url(socket, index \\ -2)
-  def nav_back_url(%Socket{private: %{@navigator => %__MODULE__{view: view, history: history}}}, index) do
+  def nav_back_url(
+    %Socket{private: %{@navigator => %__MODULE__{history: history, fallback_url: fallback_url}}},
+    index
+  ) do
     case History.find(history, index) do
       %{url: url} -> url_path(url)
-      _ -> get_fallback_url(view)
+      _ -> fallback_url
     end
   end
   def nav_back_url(_socket, _index), do: nil
@@ -648,14 +667,14 @@ defmodule LiveNavigator do
   """
   @spec nav_pop_stack_url(Socket.t) :: binary | nil
   def nav_pop_stack_url(
-    %Socket{private: %{@navigator => %__MODULE__{view: view, history: history}}}
+    %Socket{private: %{@navigator => %__MODULE__{history: history, fallback_url: fallback_url}}}
   ) when length(history) < 2 do
-    get_fallback_url(view)
+    fallback_url
   end
-  def nav_pop_stack_url(%Socket{private: %{@navigator => %__MODULE__{view: view, history: history}}}) do
+  def nav_pop_stack_url(%Socket{private: %{@navigator => %__MODULE__{history: history, fallback_url: fallback_url}}}) do
     case History.stack_preceding(history) do
       %{url: url} -> url_path(url)
-      _ -> get_fallback_url(view)
+      _ -> fallback_url
     end
   end
   def nav_pop_stack_url(_socket), do: nil
@@ -694,8 +713,7 @@ defmodule LiveNavigator do
     |> navigate_back(spec, true)
     |> apply_awaiting(socket, opts[:navigate])
   end
-  def nav_pop_stack(%Socket{private: %{@navigator => %__MODULE__{view: view} = navigator}} = socket, _opts) do
-    url = get_fallback_url(view)
+  def nav_pop_stack(%Socket{private: %{@navigator => %__MODULE__{fallback_url: url} = navigator}} = socket, _opts) do
     navigator = update(navigator, :history, [])
     Controller.save(navigator)
     socket
@@ -795,11 +813,8 @@ defmodule LiveNavigator do
   def navigate_back(%__MODULE__{} = navigator, %{id: id, url: url}, unstack) do
     put_awaiting(navigator, url, %{method: :navigate, action: {:replace, id, unstack}})
   end
-  def navigate_back(%__MODULE__{view: view} = navigator, _spec, unstack) do
-    case get_fallback_url(view) do
-      to when is_binary(to) -> put_awaiting(navigator, to, %{method: :navigate, action: {:replace, 0, unstack}})
-      _ -> navigator
-    end
+  def navigate_back(%__MODULE__{fallback_url: to} = navigator, _spec, unstack) when is_binary(to) do
+    put_awaiting(navigator, to, %{method: :navigate, action: {:replace, 0, unstack}})
   end
   def navigate_back(navigator, _spec, _unstack), do: navigator
 
@@ -846,16 +861,6 @@ defmodule LiveNavigator do
     navigator
     |> update(:assigns, nav_assigns)
     |> Controller.save()
-  end
-
-  @doc false
-  @spec get_fallback_url(module) :: url | nil
-  def get_fallback_url(view) do
-    case view.__navigator__(:fallback_url) do
-      nil -> nil
-      url when is_binary(url) -> url
-      url when is_atom(url) -> if function_exported?(view, url, 0), do: apply(view, url, [])
-    end
   end
 
   defp apply_awaiting(navigator, socket, false), do: put_navigator(socket, navigator)
@@ -1046,4 +1051,28 @@ defmodule LiveNavigator do
       end
     Map.put(spec, :action, {:replace, id, unstack})
   end
+
+  defp put_fallback_url(navigator, %Page{fallback_url: url}, socket) when not is_nil(url) do
+    put_fallback_url(navigator, url, socket)
+  end
+  defp put_fallback_url(%{view: view} = navigator, %Page{}, socket) when not is_nil(view) do
+    put_fallback_url(navigator, view.__navigator__(:fallback_url), socket)
+  end
+  defp put_fallback_url(navigator, nil, _socket), do: navigator
+  defp put_fallback_url(navigator, url, _socket) when is_binary(url) do
+    %{navigator | fallback_url: url}
+  end
+  defp put_fallback_url(%{view: view} = navigator, fun, socket) when is_atom(fun) do
+    cond do
+      function_exported?(view, fun, 0) -> %{navigator | fallback_url: apply(view, fun, [])}
+      function_exported?(view, fun, 1) -> %{navigator | fallback_url: apply(view, fun, [socket])}
+    end
+  end
+  defp put_fallback_url(navigator, fun, _socket) when is_function(fun, 0) do
+    %{navigator | fallback_url: fun.()}
+  end
+  defp put_fallback_url(navigator, fun, socket) when is_function(fun, 1) do
+    %{navigator | fallback_url: fun.(socket)}
+  end
+  defp put_fallback_url(navigator, _url, _socket), do: navigator
 end

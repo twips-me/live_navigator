@@ -4,7 +4,8 @@ defmodule LiveNavigator.Page do
   """
 
   @type changes :: [atom]
-  @type field :: :session_id | :tab | :view | :action | :assigns
+  @type url :: LiveNavigator.url
+  @type field :: :session_id | :tab | :view | :action | :assigns | :fallback_url
 
   @type t :: %__MODULE__{
     session_id: binary,
@@ -12,13 +13,14 @@ defmodule LiveNavigator.Page do
     view: module,
     action: atom,
     assigns: map,
+    fallback_url: url | nil,
     __changed__: changes,
   }
 
   @enforce_keys ~w[session_id tab view action]a
-  defstruct [:session_id, :tab, :view, :action, assigns: %{}, __changed__: []]
+  defstruct [:session_id, :tab, :view, :action, :fallback_url, assigns: %{}, __changed__: []]
 
-  @simple_fields ~w[session_id tab view action]a
+  @simple_fields ~w[session_id tab view action fallback_url]a
   @complex_fields ~w[assigns]a
 
   @spec update(t, map | keyword) :: t
