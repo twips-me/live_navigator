@@ -30,10 +30,6 @@ defmodule LiveNavigator.Component do
         # EOF TODO
         current_url: 1,
         history: 1,
-        history_put: 2,
-        history_put: 3,
-        history_put: 4,
-        history_put: 5,
         nav_back: 1,
         nav_back: 2,
         nav_back_url: 1,
@@ -44,6 +40,10 @@ defmodule LiveNavigator.Component do
         push_navigate: 2,
         push_patch: 2,
         push_redirect: 2,
+        put_history: 2,
+        put_history: 3,
+        put_history: 4,
+        put_history: 5,
         redirect: 2,
       ]
     end
@@ -95,14 +95,14 @@ defmodule LiveNavigator.Component do
   end
   def redirect(socket, opts), do: LiveView.redirect(socket, opts)
 
-  @spec history_put(Socket.t, History.spec) :: Socket.t
-  @spec history_put(Socket.t, History.spec, keyword) :: Socket.t
-  @spec history_put(Socket.t, url, view) :: Socket.t
-  @spec history_put(Socket.t, url, view, action | keyword) :: Socket.t
-  @spec history_put(Socket.t, url, view, action, keyword) :: Socket.t
-  def history_put(socket, %History{} = spec), do: history_put(socket, spec, [])
-  def history_put(socket, url, view) when is_binary(url), do: history_put(socket, url, view, nil, [])
-  def history_put(%Socket{root_pid: pid} = socket, spec, opts) do
+  @spec put_history(Socket.t, History.spec) :: Socket.t
+  @spec put_history(Socket.t, History.spec, keyword) :: Socket.t
+  @spec put_history(Socket.t, url, view) :: Socket.t
+  @spec put_history(Socket.t, url, view, action | keyword) :: Socket.t
+  @spec put_history(Socket.t, url, view, action, keyword) :: Socket.t
+  def put_history(socket, %History{} = spec), do: put_history(socket, spec, [])
+  def put_history(socket, url, view) when is_binary(url), do: put_history(socket, url, view, nil, [])
+  def put_history(%Socket{root_pid: pid} = socket, spec, opts) do
     with_navigator(pid, socket, fn %{history: history} = navigator, socket ->
       history =
         if opts[:stacked] == true do
@@ -110,14 +110,16 @@ defmodule LiveNavigator.Component do
         else
           History.put(history, spec)
         end
-      LiveNavigator.update(navigator, history: history)
+      navigator
+      |> LiveNavigator.update(history: history)
+      |> Controller.save()
       notify_view(pid, [:navigator])
       socket
     end)
   end
-  def history_put(socket, url, view, action) when is_atom(action), do: history_put(socket, url, view, action, [])
-  def history_put(socket, url, view, action, opts) when is_binary(url) and is_atom(view) and is_atom(action) do
-    history_put(socket, History.new(url, view, action), opts)
+  def put_history(socket, url, view, action) when is_atom(action), do: put_history(socket, url, view, action, [])
+  def put_history(socket, url, view, action, opts) when is_binary(url) and is_atom(view) and is_atom(action) do
+    put_history(socket, History.new(url, view, action), opts)
   end
 
   @spec nav_back(Socket.t) :: Socket.t

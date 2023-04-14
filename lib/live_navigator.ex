@@ -250,10 +250,6 @@ defmodule LiveNavigator do
         current_url: 1,
         fallback_url: 1,
         history: 1,
-        history_put: 2,
-        history_put: 3,
-        history_put: 4,
-        history_put: 5,
         nav_back: 1,
         nav_back: 2,
         nav_back_url: 1,
@@ -264,6 +260,10 @@ defmodule LiveNavigator do
         push_navigate: 2,
         push_patch: 2,
         push_redirect: 2,
+        put_history: 2,
+        put_history: 3,
+        put_history: 4,
+        put_history: 5,
         redirect: 2,
         set_fallback_url: 2,
       ]
@@ -445,28 +445,28 @@ defmodule LiveNavigator do
     Enum.reduce(fields, navigator, fn {field, value}, navigator -> update(navigator, field, value) end)
   end
 
-  @spec history_put(Socket.t, History.spec) :: Socket.t
-  @spec history_put(Socket.t, History.spec, keyword) :: Socket.t
-  @spec history_put(Socket.t, url, view) :: Socket.t
-  @spec history_put(Socket.t, url, view, action | keyword) :: Socket.t
-  @spec history_put(Socket.t, url, view, action, keyword) :: Socket.t
-  @spec history_put(t, History.spec) :: t
-  @spec history_put(t, History.spec, keyword) :: t
-  @spec history_put(t, url, view) :: t
-  @spec history_put(t, url, view, action | keyword) :: t
-  @spec history_put(t, url, view, action, keyword) :: t
-  def history_put(socket_or_nav, %History{} = spec), do: history_put(socket_or_nav, spec, [])
-  def history_put(socket_or_nav, url, view) when is_binary(url) do
-    history_put(socket_or_nav, url, view, nil, [])
+  @spec put_history(Socket.t, History.spec) :: Socket.t
+  @spec put_history(Socket.t, History.spec, keyword) :: Socket.t
+  @spec put_history(Socket.t, url, view) :: Socket.t
+  @spec put_history(Socket.t, url, view, action | keyword) :: Socket.t
+  @spec put_history(Socket.t, url, view, action, keyword) :: Socket.t
+  @spec put_history(t, History.spec) :: t
+  @spec put_history(t, History.spec, keyword) :: t
+  @spec put_history(t, url, view) :: t
+  @spec put_history(t, url, view, action | keyword) :: t
+  @spec put_history(t, url, view, action, keyword) :: t
+  def put_history(socket_or_nav, %History{} = spec), do: put_history(socket_or_nav, spec, [])
+  def put_history(socket_or_nav, url, view) when is_binary(url) do
+    put_history(socket_or_nav, url, view, nil, [])
   end
-  def history_put(
+  def put_history(
     %Socket{private: %{@navigator => %__MODULE__{} = navigator}} = socket,
     %History{} = spec,
     opts
   ) do
-    put_navigator(socket, history_put(navigator, spec, opts))
+    put_navigator(socket, put_history(navigator, spec, opts))
   end
-  def history_put(%__MODULE__{history: history} = navigator, %History{} = spec, opts) do
+  def put_history(%__MODULE__{history: history} = navigator, %History{} = spec, opts) do
     history =
       if opts[:stacked] == true do
         History.put_stacked(history, spec)
@@ -475,11 +475,12 @@ defmodule LiveNavigator do
       end
     %{navigator | history: history}
   end
-  def history_put(socket_or_nav, url, view, action) when is_atom(action) do
-    history_put(socket_or_nav, url, view, action, [])
+  def put_history(socket_or_nav, url, view, action) when is_atom(action) do
+    put_history(socket_or_nav, url, view, action, [])
   end
-  def history_put(socket_or_nav, url, view, action, opts) when is_binary(url) and is_atom(view) and is_atom(action) do
-    history_put(socket_or_nav, History.new(url, view, action), opts)
+  def put_history(socket_or_nav, url, view, action, opts) when is_binary(url) and is_atom(view) and is_atom(action) do
+    url = normalize_url(socket_or_nav, url)
+    put_history(socket_or_nav, History.new(url, view, action), opts)
   end
 
   @spec set_fallback_url(Socket.t, url | nil) :: Socket.t
@@ -821,6 +822,21 @@ defmodule LiveNavigator do
   end
 
   @doc false
+  @spec normalize_url(t | Socket.t, binary) :: binary
+  def normalize_url(%Socket{private: %{@navigator => %__MODULE__{} = navigator}}, path) do
+    normalize_url(navigator, path)
+  end
+  def normalize_url(%__MODULE__{url: url}, path) do
+    case URI.parse(path) do
+      %{scheme: nil} = path ->
+        URI.to_string(%{URI.parse(url) | path: path.path, query: path.query, fragment: path.fragment})
+
+      _ ->
+        path
+    end
+  end
+
+  @doc false
   @spec now() :: NaiveDateTime.t
   def now, do: NaiveDateTime.truncate(NaiveDateTime.utc_now(), :second)
 
@@ -837,11 +853,9 @@ defmodule LiveNavigator do
     |> put_action_spec_action(action, opts[:replace], navigator)
   end
 
-  @doc false
   defp put_awaiting(%{url: url, view: view, action: action} = navigator, to, action_spec) do
     from = History.new(url, view, action)
-    path = URI.parse(to)
-    to = URI.to_string(%{URI.parse(url) | path: path.path, query: path.query, fragment: path.fragment})
+    to = normalize_url(navigator, to)
     navigator
     |> update(:awaiting, {action_spec, to, from})
     |> Controller.save()
