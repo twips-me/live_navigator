@@ -31,16 +31,16 @@ defmodule LiveNavigator.Storage do
     def touch(_table, _keys), do: :ok
   else
     @spec update([LiveNavigator.t | Page.t]) :: :ok
-    def update(entities), do: apply(@storage, :update, [entities])
+    def update(entities), do: @storage.update(entities)
 
     @spec select(LiveNavigator) :: [LiveNavigator.t]
     @spec select(Page) :: [Page.t]
-    def select(table), do: apply(@storage, :select, [table])
+    def select(table), do: @storage.select(table)
 
     @spec cleanup([cleanup_key]) :: :ok
-    def cleanup(keys), do: apply(@storage, :cleanup, [keys])
+    def cleanup(keys), do: @storage.cleanup(keys)
 
     @spec touch(LiveNavigator | Page, list) :: :ok
-    def touch(table, keys), do: apply(@storage, :touch, [table, keys])
+    def touch(table, keys), do: @storage.touch(table, keys)
   end
 end

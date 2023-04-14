@@ -250,6 +250,10 @@ defmodule LiveNavigator do
         current_url: 1,
         fallback_url: 1,
         history: 1,
+        history_put: 2,
+        history_put: 3,
+        history_put: 4,
+        history_put: 5,
         nav_back: 1,
         nav_back: 2,
         nav_back_url: 1,
@@ -263,6 +267,7 @@ defmodule LiveNavigator do
         redirect: 2,
         set_fallback_url: 2,
       ]
+
       on_mount unquote(__MODULE__)
 
       @impl unquote(__MODULE__)
@@ -438,6 +443,43 @@ defmodule LiveNavigator do
   end
   def update(navigator, fields) do
     Enum.reduce(fields, navigator, fn {field, value}, navigator -> update(navigator, field, value) end)
+  end
+
+  @spec history_put(Socket.t, History.spec) :: Socket.t
+  @spec history_put(Socket.t, History.spec, keyword) :: Socket.t
+  @spec history_put(Socket.t, url, view) :: Socket.t
+  @spec history_put(Socket.t, url, view, action | keyword) :: Socket.t
+  @spec history_put(Socket.t, url, view, action, keyword) :: Socket.t
+  @spec history_put(t, History.spec) :: t
+  @spec history_put(t, History.spec, keyword) :: t
+  @spec history_put(t, url, view) :: t
+  @spec history_put(t, url, view, action | keyword) :: t
+  @spec history_put(t, url, view, action, keyword) :: t
+  def history_put(socket_or_nav, %History{} = spec), do: history_put(socket_or_nav, spec, [])
+  def history_put(socket_or_nav, url, view) when is_binary(url) do
+    history_put(socket_or_nav, url, view, nil, [])
+  end
+  def history_put(
+    %Socket{private: %{@navigator => %__MODULE__{} = navigator}} = socket,
+    %History{} = spec,
+    opts
+  ) do
+    put_navigator(socket, history_put(navigator, spec, opts))
+  end
+  def history_put(%__MODULE__{history: history} = navigator, %History{} = spec, opts) do
+    history =
+      if opts[:stacked] == true do
+        History.put_stacked(history, spec)
+      else
+        History.put(history, spec)
+      end
+    %{navigator | history: history}
+  end
+  def history_put(socket_or_nav, url, view, action) when is_atom(action) do
+    history_put(socket_or_nav, url, view, action, [])
+  end
+  def history_put(socket_or_nav, url, view, action, opts) when is_binary(url) and is_atom(view) and is_atom(action) do
+    history_put(socket_or_nav, History.new(url, view, action), opts)
   end
 
   @spec set_fallback_url(Socket.t, url | nil) :: Socket.t
