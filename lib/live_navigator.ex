@@ -1064,11 +1064,11 @@ defmodule LiveNavigator do
     end
   end
   defp run_callback(
-    {:leave, action, %{view: view, action: action} = from},
+    {:leave, action, %{view: view, action: view_action} = from},
     %Socket{private: %{@navigator => %__MODULE__{} = navigator}} = socket
   ) do
     to = History.new(navigator)
-    navigator = %{navigator | view: view, action: action}
+    navigator = %{navigator | view: view, action: view_action}
     {cont, navigator} = Lifecycle.run_lifecycle(view, :on_page_leave, [action, from, to], navigator)
     if cont == :cont and function_exported?(view, :handle_page_leave, 4) do
       {:noreply, _navigator} = view.handle_page_leave(action, from, to, navigator)
