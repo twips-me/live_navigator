@@ -31,7 +31,7 @@ defmodule LiveNavigator.Lifecycle do
   defmacro on_page_refresh(module, arg \\ nil) do
     module = parse_module(module, {:on_page_refresh, 3}, __CALLER__)
     quote do
-      @live_navigator_lifecycle {:on_page_refresh, {unquote(module), unquote(arg)}}
+      @live_navigator_lifecycle {:on_page_refresh, {unquote(module), unquote(Macro.escape(arg))}}
     end
   end
 
@@ -40,7 +40,7 @@ defmodule LiveNavigator.Lifecycle do
   defmacro on_page_enter(module, arg \\ nil) do
     module = parse_module(module, {:on_page_enter, 5}, __CALLER__)
     quote do
-      @live_navigator_lifecycle {:on_page_enter, {unquote(module), unquote(arg)}}
+      @live_navigator_lifecycle {:on_page_enter, {unquote(module), unquote(Macro.escape(arg))}}
     end
   end
 
@@ -49,7 +49,7 @@ defmodule LiveNavigator.Lifecycle do
   defmacro on_page_leave(module, arg \\ nil) do
     module = parse_module(module, {:on_page_leave, 5}, __CALLER__)
     quote do
-      @live_navigator_lifecycle {:on_page_leave, {unquote(module), unquote(arg)}}
+      @live_navigator_lifecycle {:on_page_leave, {unquote(module), unquote(Macro.escape(arg))}}
     end
   end
 
