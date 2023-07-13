@@ -292,7 +292,7 @@ defmodule LiveNavigator do
     lifecycle = Lifecycle.lifecycle(env)
     fallback_url = Module.get_attribute(env.module, :live_navigator_fallback_url)
     quote do
-      def __navigator__(:lifecycle), do: unquote(lifecycle)
+      def __navigator__(:lifecycle), do: unquote(Macro.escape(lifecycle))
       def __navigator__(:fallback_url), do: unquote(fallback_url)
     end
   end
